@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">OtpSenderClient</string>
+    <string name="rabbitConnectioinString">amqps://tplcvlpf:YM0mdK4Unx01AQ8xZpM7J-0XqQ4IvVbr@puffin.rmq2.cloudamqp.com/tplcvlpf</string>
+</resources>
