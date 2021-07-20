@@ -1,6 +1,8 @@
 package com.covid19army.otpsenderclient
 
+import android.Manifest
 import android.content.Context
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,6 +11,7 @@ import android.telephony.SmsManager
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.*
 import com.rabbitmq.client.*
@@ -21,10 +24,12 @@ class MainActivity : AppCompatActivity() {
     lateinit var channel:Channel
     lateinit var subscribeThread: Thread
     lateinit var tv: TextView
+    lateinit var smsReceiver: SmsReceiver
     val mapper = jacksonObjectMapper()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        requestPermissions()
         tv =  findViewById<TextView>(R.id.message)
         setupConnectionFactory()
         Toast.makeText(applicationContext,"connection successful to rabbit mq",Toast.LENGTH_SHORT).show()
@@ -32,6 +37,9 @@ class MainActivity : AppCompatActivity() {
         val handler = MyHandler(tv, mapper, applicationContext)
 
         subscribe(handler)
+
+
+
     }
 
 
@@ -84,7 +92,7 @@ class MainActivity : AppCompatActivity() {
         override fun handleMessage(msg: Message) {
             super.handleMessage(msg)
             val data = msg.data.getString("msg")
-            val otp:Otp = mapper.readValue(data!!)
+            val otp:OtpMessage = mapper.readValue(data!!)
 
             weakTextView.text = otp.mobilenumber
             try {
@@ -102,10 +110,6 @@ class MainActivity : AppCompatActivity() {
                 ex.printStackTrace()
             }
         }
-    }
-
-    class Otp(val mobilenumber:String,val otp:Int){
-
     }
 
     class MyConsumer( val handler: Handler, channel: Channel) : DefaultConsumer(channel){
@@ -135,11 +139,52 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun requestPermissions(){
+        ActivityCompat.requestPermissions(
+            this, arrayOf(
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_SMS
+            ), 12
+        )
+    }
+
+    fun registerSmsReceiver(smsRecievedListener: onSmsRecievedListener){
+
+        smsReceiver = SmsReceiver()
+        smsReceiver.setOnSmsReceivedListener(smsRecievedListener)
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("android.provider.Telephony.SMS_RECEIVED")
+        this.registerReceiver(smsReceiver, intentFilter)
+    }
+
+    public override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        registerSmsReceiver(SmsReceivedListenerImpl(applicationContext))
+    }
+
 
     public override fun onDestroy() {
         super.onDestroy()
-        subscribeThread.interrupt()
+        try {
+            subscribeThread.interrupt()
+            this.unregisterReceiver(smsReceiver)
+        }catch (e:java.lang.Exception){
+
+        }
+
     }
+
+class SmsReceivedListenerImpl(val context: Context) : onSmsRecievedListener{
+    override fun onReceived(message: OtpMessage) {
+        Toast.makeText(context, "${message.mobilenumber} ${message.otp}", Toast.LENGTH_SHORT ).show()
+    }
+
+}
+
     /*
     ConnectionFactory factory = new ConnectionFactory();
     private fun setupConnectionFactory() {
