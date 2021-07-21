@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">OtpSenderClient</string>
-    <string name="rabbitConnectioinString">amqps://tplcvlpf:YM0mdK4Unx01AQ8xZpM7J-0XqQ4IvVbr@puffin.rmq2.cloudamqp.com/tplcvlpf</string>
+    <string name="rabbitConnectionString">amqps://tplcvlpf:YM0mdK4Unx01AQ8xZpM7J-0XqQ4IvVbr@puffin.rmq2.cloudamqp.com/tplcvlpf</string>
+    <string name="onscreen_otp_validation_exchange">onscreen.otp.validation.exchange</string>
 </resources>

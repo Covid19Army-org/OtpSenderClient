@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Message
 import android.telephony.SmsManager
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun setupConnectionFactory() {
-        var uri = getString(R.string.rabbitConnectioinString);
+        var uri = getString(R.string.rabbitConnectionString);
         try {
             factory.setAutomaticRecoveryEnabled(false);
             factory.setUri(uri);
@@ -143,7 +144,8 @@ class MainActivity : AppCompatActivity() {
         ActivityCompat.requestPermissions(
             this, arrayOf(
                 Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_SMS
+                Manifest.permission.READ_SMS,
+                Manifest.permission.SEND_SMS
             ), 12
         )
     }
@@ -163,7 +165,8 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        registerSmsReceiver(SmsReceivedListenerImpl(applicationContext))
+        //setupConnectionFactory()
+        registerSmsReceiver(SmsReceivedListenerImpl(applicationContext, mapper))
     }
 
 
@@ -178,9 +181,44 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-class SmsReceivedListenerImpl(val context: Context) : onSmsRecievedListener{
+class SmsReceivedListenerImpl(val context: Context, val mapper: ObjectMapper) : onSmsRecievedListener{
+    val queueConnectionFactory: ConnectionFactory = ConnectionFactory()
     override fun onReceived(message: OtpMessage) {
         Toast.makeText(context, "${message.mobilenumber} ${message.otp}", Toast.LENGTH_SHORT ).show()
+        setupConnectionFactory()
+
+        var publisherThread = Thread{
+            val connection = queueConnectionFactory.newConnection()
+            val channel = connection.createChannel()
+            channel.basicQos(1)
+            try {
+                val messageData = mapper.writeValueAsString(message)
+                val exchangeName = context.getString(R.string.onscreen_otp_validation_exchange)
+                channel.basicPublish(exchangeName,"",null,messageData.toByteArray())
+                channel.close()
+                connection.close()
+            }catch (e:Exception){
+                Log.d("Publish",e.message!!)
+                channel.close()
+                connection.close()
+            }finally {
+                Thread.currentThread().interrupt()
+            }
+        }
+        publisherThread.start()
+
+    }
+
+    private fun setupConnectionFactory() {
+        var uri = context.getString(R.string.rabbitConnectionString);
+        try {
+            queueConnectionFactory.setAutomaticRecoveryEnabled(false);
+            queueConnectionFactory.setUri(uri);
+
+
+        } catch ( e1:Exception) {
+            e1.printStackTrace();
+        }
     }
 
 }
